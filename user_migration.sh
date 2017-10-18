@@ -20,3 +20,8 @@ do
 			;;
 	esac
 done
+
+while read -r LINE|| [[ -n "${LINE}" ]];
+do
+	echo "Text read: ${LINE}"
+done <"${FILE}"
