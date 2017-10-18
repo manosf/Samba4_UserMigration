@@ -24,4 +24,6 @@ done
 while read -r LINE|| [[ -n "${LINE}" ]];
 do
 	echo "Text read: ${LINE}"
+    PASS="$(gpg --gen-random --armor 1 10)"
+    echo "Random password: ${PASS}"
 done <"${FILE}"
