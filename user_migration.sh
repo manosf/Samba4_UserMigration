@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-FILE=ldapusers.txt
+FILE="ldapusers.txt"
+LINE=0
 
 if [ "$EUID" != "0" ]; 
 then
@@ -21,9 +22,22 @@ do
 	esac
 done
 
+if [ "$HELP" == "1" ];
+then
+    printf "Options and arguments:\n"
+	echo "-h | --help Displays a usage message and exits."
+    echo "-f | --file Specifies the file in which the users exist (default: ldapusers.txt)."
+    exit 1
+fi
+
+passwd_gen()
+{
 while read -r LINE|| [[ -n "${LINE}" ]];
 do
-	echo "Text read: ${LINE}"
+	LINECOUNT=$(( $LINECOUNT + 1 ))
     PASS="$(gpg --gen-random --armor 1 10)"
-    echo "Random password: ${PASS}"
-done <"${FILE}"
+	sed -i "${LINECOUNT}s/.*/${LINE}\, ${PASS}/" "$1"
+done <"$1"
+}
+
+passwd_gen ${FILE}
