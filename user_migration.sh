@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 FILE="ldapusers.txt"
-LINE=0
+LINECOUNT=0
 
 if [ "$EUID" != "0" ]; 
 then
@@ -35,7 +35,7 @@ passwd_gen()
 while read -r LINE|| [[ -n "${LINE}" ]];
 do
 	LINECOUNT=$(( $LINECOUNT + 1 ))
-    PASS="$(gpg --gen-random --armor 1 10)"
+	PASS="$(gpg --gen-random --armor 1 10)"
 	sed -i "${LINECOUNT}s/.*/${LINE}\, ${PASS}/" "$1"
 done <"$1"
 }
