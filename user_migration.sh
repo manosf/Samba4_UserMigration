@@ -3,6 +3,8 @@
 FILE="ldapusers.txt"
 LINECOUNT=0
 REGEXP="^p[0-9]|^mpsp[0-9]|^mppl[0-9]"
+PATH=`realpath $0 | rev | cut -d'/' -f2- | rev`
+LOCALIP=`ip addr | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut -f1  -d'/'`
 REMOTEIP="1.1.1.1"      #Replace with the desired IP of the remote server
 
 if [ "$EUID" != "0" ]; 
@@ -14,13 +16,13 @@ fi
 for args in $*
 do
 	case $args in
-		--help|-h)
+        --help|-h)
 			HELP="1";
 			;;
-		--file|-f)
-			FILE=$2;
-			shift 2
-			;;
+        --file|-f)
+	        FILE=$2;
+            shift 2
+            ;;
         --server-ip|-i)
             REMOTEIP=$2;
             shift 2
@@ -49,7 +51,7 @@ fi
 if [ "$GETUSERS" == "1" ];
 then
     echo "Collecting all users into ${FILE}" 
-    ssh ${REMOTEIP} "bash -s" < user_collection.sh      #Make sure to have ssh-key set up for root
+    ssh ${REMOTEIP} "bash -s" < user_collection.sh -f ${FILE} -p ${REGEXP} -s ${PATH} -i ${LOCALIP}  #Make sure to have ssh-keys authentication set up for root
 fi
 
 passwd_gen()
