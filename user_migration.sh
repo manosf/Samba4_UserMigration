@@ -3,6 +3,7 @@
 FILE="ldapusers.txt"
 LINECOUNT=0
 REGEXP="^p[0-9]|^mpsp[0-9]|^mppl[0-9]"
+REMOTEIP="1.1.1.1"      #Replace with the desired IP of the remote server
 
 if [ "$EUID" != "0" ]; 
 then
@@ -20,11 +21,15 @@ do
 			FILE=$2;
 			shift 2
 			;;
-		--get-users|-g)
-			GETUSERS="1";
-			;;
+        --server-ip|-i)
+            REMOTEIP=$2;
+            shift 2
+            ;;
+        --get-users|-g)
+            GETUSERS="1";
+            ;;
         --pattern|-p)
-            REGEXP=$3;
+            REGEXP=$2;
             shift 2
             ;;
 	esac
@@ -33,19 +38,20 @@ done
 if [ "$HELP" == "1" ];
 then
     printf "Options and arguments:\n"
-	echo "-h | --help Displays a usage message and exits."
+    echo "-h | --help Displays a usage message and exits."
     echo "-f | --file Specifies the file in which the users exist (default: ldapusers.txt)."
     echo "-g | --get-users Export users with their fullname into a txt file (default: ldapusers.txt) using a RegEx"
     echo "-p | --pattern Specifies the Regular Expersion you want to use to collect User data into a file"
     exit 1
 fi
 
-if [ "$GETUSERS" == "1" ]
+
+if [ "$GETUSERS" == "1" ];
 then
-    echo "Collecting all Users into ${FILE} "
-    getent passwd | grep -E ${REGEXP} | cut -f 1,5 -d :| sort > ${FILE}
-    exit 1
+    echo "Collecting all users into ${FILE}" 
+    ssh ${REMOTEIP} "bash -s" < user_collection.sh      #Make sure to have ssh-key set up for root
 fi
+
 passwd_gen()
 {
 while read -r LINE|| [[ -n "${LINE}" ]];
