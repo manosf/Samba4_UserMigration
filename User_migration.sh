@@ -51,7 +51,7 @@ fi
 if [ "$GETUSERS" == "1" ];
 then
     echo "Collecting all users into ${FILE}" 
-    ssh ${REMOTEIP} "bash -s" < user_collection.sh -f ${FILE} -p ${REGEXP} -s ${FPATH} -i ${LOCALIP}  #Make sure to have ssh-keys authentication set up for root
+    ssh ${REMOTEIP} "bash -s" < user_collection.sh -f ${FILE} -p ${REGEXP} -s ${PATH} -i ${LOCALIP}  #Make sure to have ssh-keys authentication set up for root
 fi
 
 passwd_gen()
@@ -66,16 +66,15 @@ done <"$1"
 
 name_parsing()
 {
-while IFS=':' read -ra LINE; 
-do
-	for field in "${LINE[@]}";
-	do
-      	REGNUM=${LINE[0]}
-       	NAME=${LINE[1]}
-	    PASS=${LINE[2]}
-    done
-done < "$1"
+while IFS=':' read -ra ADDR; do
+	for user in "${ADDR[@]}"; do
+		echo $ADDR
+		REGNUM=${ADDR[0]}
+		#NAME=$ADDR[1]
+		#PASS=ADDR[2]
+	done
+done <<< "$1"
 }
 
-passwd_gen ${FILE}
+#passwd_gen ${FILE}
 name_parsing ${FILE}
