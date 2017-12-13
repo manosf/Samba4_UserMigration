@@ -73,6 +73,7 @@ do
       	REGNUM=${LINE[0]}
        	NAME=${LINE[1]}
 	    PASS=${LINE[2]}
+	echo "Your name and new password ${NAME} - ${PASS}" | mail -s "Password Reset - New Password" -a "From: postmaster@domainname.suffix" ${REGNUM}@domainname.suffix
     done
 done < "$1"
 }
