@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 
+#Default file location of exported users
 FILE="ldapusers.txt"
 LINECOUNT=0
-REGEXP="^p[0-9]|^mpsp[0-9]|^mppl[0-9]"
 FPATH=`realpath $0 | rev | cut -d'/' -f2- | rev`
-LOCALIP=`ip addr | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut -f1  -d'/'`
-REMOTEIP="1.1.1.1"      #Replace with the desired IP of the remote server
+#Default User Attributes 
+#Replace with your Default Settings
+DOMAIN="EXAMPLE.COM"
+AD_HOSTNAME="DC1"
+HOME_PATH="\\\\${AD_HOSTNAME}.${DOMAIN}\\Homes\\"
+PROFILE_PATH="\\\\${AD_HOSTNAME}.${DOMAIN}\\profiles\\profile-user"
+HOME_DRIVE="P"
+NIS_DOMAIN="example"
+UNIX_HOME="/home/"
+UNIX_SHELL="/bin/false"
+UNIX_GID="513"
+MAIL_SERVER="mail.example.com"
 
 if [ "$EUID" != "0" ]; 
 then
@@ -18,21 +28,15 @@ do
 	case $args in
         --help|-h)
 			HELP="1";
+			shift 1
 			;;
         --file|-f)
 	        FILE=$2;
             shift 2
             ;;
-        --server-ip|-i)
-            REMOTEIP=$2;
-            shift 2
-            ;;
         --get-users|-g)
             GETUSERS="1";
-            ;;
-        --pattern|-p)
-            REGEXP=$2;
-            shift 2
+			shift 1
             ;;
 	esac
 done
@@ -43,7 +47,6 @@ then
     echo "-h | --help Displays a usage message and exits."
     echo "-f | --file Specifies the file in which the users exist (default: ldapusers.txt)."
     echo "-g | --get-users Export users with their fullname into a txt file (default: ldapusers.txt) using a RegEx"
-    echo "-p | --pattern Specifies the Regular Expersion you want to use to collect User data into a file"
     exit 1
 fi
 
@@ -51,7 +54,7 @@ fi
 if [ "$GETUSERS" == "1" ];
 then
     echo "Collecting all users into ${FILE}" 
-    ssh ${REMOTEIP} "bash -s" < user_collection.sh -f ${FILE} -p ${REGEXP} -s ${FPATH} -i ${LOCALIP}  #Make sure to have ssh-keys authentication set up for root
+	bash ${FPATH}/user_collection.sh
 fi
 
 passwd_gen()
@@ -59,24 +62,76 @@ passwd_gen()
 while read -r LINE|| [[ -n "${LINE}" ]];
 do
 	LINECOUNT=$(( $LINECOUNT + 1 ))
-	PASS="$(gpg --gen-random --armor 1 10)"
+	#Generate random 16 character alphanumeric string
+	PASS="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 16)"
 	sed -i "${LINECOUNT}s~.*~${LINE}:${PASS}~" "$1"
 done <"$1"
 }
 
 name_parsing()
 {
+LINECOUNT=0
 while IFS=':' read -ra LINE; 
 do
 	for field in "${LINE[@]}";
 	do
 		REGNUM=${LINE[0]}
-    	NAME=${LINE[1]}
+		NAME=${LINE[1]}
 		PASS=${LINE[2]}
-    done
-	echo "Your name and new password ${NAME} - ${PASS}" | mail -s "Password Reset - New Password" -a "From: postmaster@domainname.suffix" ${REGNUM}@domainname.suffix
+    	done
+	echo "Your name and new password ${NAME} - ${PASS}"
+	create_user
 done < "$1"
+}
+create_user() 
+{
+echo "${NAME}"
+SURNAME=`echo ${NAME}| cut -f1 -d " "` 
+FIRSTNAME=`echo ${NAME}| cut -f2 -d " "`
+NEXTUID=$((`ldbsearch -H /var/lib/samba/private/sam.ldb '(objectclass=person)' | grep uidNumber  | awk '{print $NF}' | sort -g | tail -n 1`+1))
+echo " Your username is ${REGNUM}, your Surname is ${SURNAME}, your FirstName is ${FIRSTNAME} and your password is ${PASS}"
+samba-tool user create $REGNUM ${PASS} \
+	--use-username-as-cn \
+	--given-name="${FIRSTNAME}" \
+	--surname="${SURNAME}" \
+	--home-drive=P \
+	--home-directory="${HOME_PATH}${REGNUM}" \
+	--profile-path="${PROFILE_PATH}" \
+	--job-title="Student" \
+	--nis-domain=cslabs \
+	--uid-number="${NEXTUID}" \
+	--gid-number="${UNIX_GID}" \
+	--login-shell="${UNIX_SHELL}" \
+	--unix-home="${UNIX_HOME}${REGNUM}/" \
+	--mail-address="${REGNUM}@${MAIL_SERVER}" \
+	--must-change-at-next-login
+#Add user to his group
+samba-tool group addmembers "Students" ${REGNUM}
+#Creates User's Home Directory
+mkdir /srv/samba/Students/${REGNUM}/
+chown -R ${REGNUM}:"Domain Admins" /srv/samba/Students/${REGNUM}/
+chmod 700 /srv/samba/Students/${REGNUM}/
+#Set user's quota limit
+setquota -u ${REGNUM} 204800 1433600 0 0 -a /srv
+}
+
+check_if_users_exist()
+{
+LINECOUNT=0
+while read -r LINE|| [[ -n "${LINE}" ]];
+do
+	LINECOUNT=$(( $LINECOUNT + 1 ))
+	if [ `wbinfo -u | grep ${REGNUM} | wc -l` -eq 1 ];
+	then
+		echo "Account Exists"
+		sed -i "${LINECOUNT}s~.*~${LINE}:1~" "$1"
+	else 
+		echo "Account Doesn't Exists"
+		sed -i "${LINECOUNT}s~.*~${LINE}:1~" "$1"
+	fi 
+done <"$1"
 }
 
 passwd_gen ${FILE}
 name_parsing ${FILE}
+check_if_users_exist ${FILE}
